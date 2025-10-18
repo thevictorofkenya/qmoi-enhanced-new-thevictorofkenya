@@ -32,6 +32,25 @@ jobs:
             exit 1
           fi
 
+      - name: Verify UPSTREAM_PAT can access upstream via git
+        env:
+          UPSTREAM_PAT: ${{ secrets.UPSTREAM_PAT }}
+        run: |
+          set -e
+          if [ -z "${UPSTREAM_PAT:-}" ]; then
+            echo "ERROR: UPSTREAM_PAT secret is not set" >&2
+            exit 1
+          fi
+          echo "Checking git access to upstream repository..."
+          # Use a one-off extraheader to avoid persisting token in git remotes
+          if git -c http.extraheader="Authorization: Bearer ${UPSTREAM_PAT}" ls-remote https://github.com/thealphakenya/qmoi-enhanced.git HEAD >/dev/null 2>&1; then
+            echo "UPSTREAM_PAT: git access to upstream OK"
+          else
+            echo "UPSTREAM_PAT: cannot access upstream via git (permissions/SSO issue)." >&2
+            echo "Hint: ensure the token owner is a collaborator or org member with repo write (or fine-grained Code Read & Write) and SSO-approved if required." >&2
+            exit 1
+          fi
+
       - name: Create sync branch and push to origin
         run: |
           SYNC_BRANCH="sync-from-public-$(echo $GITHUB_SHA | cut -c1-8)"
