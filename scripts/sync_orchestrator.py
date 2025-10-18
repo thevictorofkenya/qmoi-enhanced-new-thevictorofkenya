@@ -95,19 +95,27 @@ def push_branch_to_upstream(upstream_owner, upstream_repo, branch, token):
 
     Returns (success_boolean, details_dict)
     """
-    remote_url = f"https://x-access-token:{token}@github.com/{upstream_owner}/{upstream_repo}.git"
-    details = {"remote_url_masked": f"https://x-access-token:***@github.com/{upstream_owner}/{upstream_repo}.git"}
+    # We'll avoid embedding the token into a stored remote URL. Use git's
+    # http.extraheader to pass an Authorization header for the single push.
+    push_url = f"https://github.com/{upstream_owner}/{upstream_repo}.git"
+    details = {"push_url": push_url, "remote_url_masked": f"***github.com/{upstream_owner}/{upstream_repo}.git"}
 
-    # Add a temporary remote and push
-    rc, out, err = run_cmd(f'git remote add upstream {remote_url}')
-    details['add_remote'] = {'rc': rc, 'out': out, 'err': err}
-    # rc may be non-zero if remote already exists; continue anyway
-
-    rc, out, err = run_cmd(f'git push upstream HEAD:refs/heads/{branch} --no-verify')
+    # Use an extraheader for a one-off authenticated push. Quoted header keeps
+    # it as a single argv token when split by shlex.
+    cmd = f'git -c http.extraheader="Authorization: Bearer {token}" push {push_url} HEAD:refs/heads/{branch} --no-verify'
+    rc, out, err = run_cmd(cmd)
     details['push'] = {'rc': rc, 'out': out, 'err': err}
 
-    # try to remove the remote (best-effort)
-    run_cmd('git remote remove upstream')
+    # Interpret common failures and provide actionable hints
+    if rc != 0:
+        hint = None
+        err_lower = (err or '').lower()
+        if 'repository not found' in err_lower or "not found" in err_lower:
+            hint = 'Upstream repository not found or token lacks access. Ensure UPSTREAM_PAT belongs to an account with push access to the upstream (and SSO-approved if the upstream is in an org).'
+        elif 'authentication failed' in err_lower or 'could not read from remote repository' in err_lower or 'access denied' in err_lower:
+            hint = 'Authentication failed. Verify the UPSTREAM_PAT has the correct scopes (repo write) and that the token owner has permission on the upstream repository.'
+        if hint:
+            details['hint'] = hint
 
     success = rc == 0
     return success, details
