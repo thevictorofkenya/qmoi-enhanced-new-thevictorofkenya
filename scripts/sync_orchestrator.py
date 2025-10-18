@@ -157,7 +157,8 @@ def main():
     branch = sys.argv[2]
     sha = sys.argv[3]
 
-    token = os.environ.get('UPSTREAM_PAT')
+    # Prefer an installation token from a GitHub App if present (safer), else fallback to UPSTREAM_PAT
+    token = os.environ.get('INSTALLATION_TOKEN') or os.environ.get('UPSTREAM_PAT')
     debug_dir = '/tmp'
     result_path = os.path.join(debug_dir, 'sync_orchestrator_result.json')
     full_path = os.path.join(debug_dir, 'sync_orchestrator_full.json')
@@ -170,6 +171,7 @@ def main():
         'created_pr_url': None,
         'existing_prs': [],
         'errors': [],
+        'token_type': 'none',
     }
 
     if not token:
@@ -178,6 +180,11 @@ def main():
         result['errors'].append(err)
         save_json(result_path, result)
         sys.exit(1)
+    else:
+        if os.environ.get('INSTALLATION_TOKEN'):
+            result['token_type'] = 'installation_token'
+        else:
+            result['token_type'] = 'upstream_pat'
 
     upstream_owner = 'thealphakenya'
     upstream_repo = 'qmoi-enhanced'
