@@ -1,0 +1,17 @@
+---
+# GitHub App manifest for repo-level installation
+# Register this manifest at https://github.com/settings/apps/new
+# After registering, install the app on the upstream org/repo.
+name: qmoi-enhanced-sync-app
+url: https://example.com/qmoi-enhanced-sync-app
+hook_attributes:
+  url: https://example.com/github-app
+public: false
+default_permissions:
+  contents: write
+  metadata: read
+  pull_requests: write
+  issues: read
+default_events:
+  - push
+  - pull_request

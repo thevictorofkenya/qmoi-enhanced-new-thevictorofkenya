@@ -1,0 +1,37 @@
+name: Example: use GitHub App installation token in Actions
+
+on: [workflow_dispatch]
+
+jobs:
+  mint-and-use:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      UPSTREAM_REPO: thealphakenya/qmoi-enhanced
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyjwt requests
+
+      - name: Mint installation token (example)
+        env:
+          APP_ID: ${{ secrets.GH_APP_ID }}
+          INSTALLATION_ID: ${{ secrets.GH_APP_INSTALLATION_ID }}
+          PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
+        run: |
+          echo "Writing private key to /tmp/app.pem"
+          printf "%s" "$PRIVATE_KEY" > /tmp/app.pem
+          python3 .github/apps/mint_installation_token.py --app-id "$APP_ID" --installation-id "$INSTALLATION_ID" --private-key-file /tmp/app.pem > /tmp/installation_token
+          echo "INSTALLATION_TOKEN=$(cat /tmp/installation_token)" >> $GITHUB_ENV
+
+      - name: Use installation token to push a branch (example)
+        env:
+          INSTALLATION_TOKEN: ${{ env.INSTALLATION_TOKEN }}
+        run: |
+          git checkout -b test-app-token
+          git -c http.extraheader="Authorization: Bearer $INSTALLATION_TOKEN" push https://github.com/${{ env.UPSTREAM_REPO }}.git HEAD:refs/heads/test-app-token
