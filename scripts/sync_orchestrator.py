@@ -120,15 +120,24 @@ def check_branch_exists_on_public(public_owner, repo, branch, token=None):
     If the public fork's repo name differs from the upstream repo name this will
     return False (caller can then provide guidance).
     """
+    details = {}
+    # First: if this is running in a checked-out repository (Actions), prefer
+    # using local git to check the refs — it's fast and doesn't require API auth.
+    rc, out, err = run_cmd(f'git rev-parse --verify --quiet refs/remotes/origin/{branch}')
+    details['git_rev_parse'] = {'rc': rc, 'out': out, 'err': err}
+    if rc == 0:
+        details['body'] = 'branch exists (local origin ref)'
+        return True, details
+
+    # Fallback: ask the GitHub API (may require auth for private forks)
     url = f'https://api.github.com/repos/{public_owner}/{repo}/branches/{branch}'
     code, body = http_get(url, token)
-    details = {'check_url': url, 'http_code': code}
+    details['check_url'] = url
+    details['http_code'] = code
+    details['body'] = body
     if code == 200:
-        details['body'] = 'branch exists'
         return True, details
-    else:
-        details['body'] = body
-        return False, details
+    return False, details
 
 
 def main():
